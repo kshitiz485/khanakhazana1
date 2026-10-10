@@ -20,10 +20,27 @@ describe('resolveRecipeImage', () => {
     expect(resolveRecipeImage('/pie.webp', cdn).mimeType).toBe('image/webp');
   });
 
-  it('passes full URLs through untouched', () => {
-    const resolved = resolveRecipeImage('https://example.com/a.JPG?x=1', cdn);
-    expect(resolved.src).toBe('https://example.com/a.JPG?x=1');
-    expect(resolved.mimeType).toBe('image/jpeg');
+  it('passes full URLs and browser-generated URLs through untouched', () => {
+    const external = resolveRecipeImage('https://example.com/a.JPG?x=1', cdn);
+    expect(external.src).toBe('https://example.com/a.JPG?x=1');
+    expect(external.mimeType).toBe('image/jpeg');
+
+    const blob = resolveRecipeImage('blob:https://example.com/1234', cdn);
+    expect(blob.src).toBe('blob:https://example.com/1234');
+    expect(blob.isPlaceholder).toBe(false);
+
+    const data = resolveRecipeImage('data:image/png;base64,AAAA', cdn);
+    expect(data.src).toBe('data:image/png;base64,AAAA');
+    expect(data.mimeType).toBe('image/png');
+  });
+
+  it('keeps relative paths valid when a CDN base URL is configured', () => {
+    expect(resolveRecipeImage('/images/pie.jpg', cdn).src).toBe(
+      'https://cdn.example.com/pie.jpg'
+    );
+    expect(resolveRecipeImage('uploads/pie.jpg', cdn).src).toBe(
+      'https://cdn.example.com/uploads/pie.jpg'
+    );
   });
 
   it('falls back to the placeholder without a value or a base URL', () => {

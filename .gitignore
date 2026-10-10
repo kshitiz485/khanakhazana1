@@ -4,6 +4,7 @@ dist/
 
 # Generated types
 .astro/
+supabase/.temp/
 .vscode
 .idea
 

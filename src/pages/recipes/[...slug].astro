@@ -9,6 +9,7 @@ import Clipboard from '@components/Clipboard.astro';
 import RecipeImage from '@components/RecipeImage.astro';
 import PrintRecipe from '@components/PrintRecipe.astro';
 import RecipeCard from '@components/RecipeCard.astro';
+import DeleteRecipeButton from '@components/DeleteRecipeButton.astro';
 import { relatedRecipes } from '@/lib/catalogue';
 import { parseCommunityRecipeDetails } from '@/lib/communityRecipe';
 import { supabase } from '@/lib/supabase';
@@ -180,16 +181,7 @@ const publishedOn = entry.data.pubDate.toLocaleDateString(undefined, {
         <div class="no-print inline-flex items-center gap-x-1">
           <PrintRecipe />
           <Bookmark recipeId={entry.id} />
-          {canShowDeleteButton && (
-            <button
-              id="delete-recipe"
-              type="button"
-              data-recipe-slug={slug}
-              class="hidden rounded-full border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
-            >
-              Delete recipe
-            </button>
-          )}
+          {canShowDeleteButton && <DeleteRecipeButton slug={slug} />}
         </div>
       </div>
     </div>
@@ -317,76 +309,3 @@ const publishedOn = entry.data.pubDate.toLocaleDateString(undefined, {
     <span>{`openstove.org${recipePath}`}</span>
   </footer>
 </MainLayout>
-
-{canShowDeleteButton && <script>
-  import { supabase } from '@/lib/supabase';
-
-  const deleteButton = document.getElementById(
-    'delete-recipe'
-  ) as HTMLButtonElement | null;
-  const recipeSlug = deleteButton?.dataset.recipeSlug;
-
-  async function showDeleteOption() {
-    if (!supabase || !deleteButton) return;
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Could not check recipe delete permissions:', error);
-      return;
-    }
-
-    if (session?.user.email?.toLowerCase() === 'kshitiz6000@gmail.com') {
-      deleteButton.classList.remove('hidden');
-    }
-  }
-
-  deleteButton?.addEventListener('click', async () => {
-    if (!supabase || !recipeSlug || !deleteButton) return;
-    if (!window.confirm('Delete this recipe? This cannot be undone.')) return;
-
-    deleteButton.disabled = true;
-    deleteButton.textContent = 'Deleting…';
-
-    try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      if (!session?.access_token) {
-        throw new Error('Please log in again to delete this recipe.');
-      }
-
-      const response = await fetch(
-        `/api/recipes/${encodeURIComponent(recipeSlug)}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-      const result = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-      };
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || 'Could not delete the recipe.');
-      }
-
-      window.location.assign('/recipes');
-    } catch (error) {
-      console.error('Could not delete recipe:', error);
-      window.alert(
-        error instanceof Error ? error.message : 'Could not delete the recipe.'
-      );
-      deleteButton.disabled = false;
-      deleteButton.textContent = 'Delete recipe';
-    }
-  });
-
-  void showDeleteOption();
-</script>}

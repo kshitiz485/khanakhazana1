@@ -56,11 +56,18 @@ export function resolveRecipeImage(
 
 function resolveSrc(value: string, baseUrl: string | undefined): string {
   if (!value) return PLACEHOLDER_IMAGE;
-  if (/^https?:\/\//i.test(value)) return value;
+
+  const trimmed = value.trim();
+  if (
+    /^(?:[a-z]+:)?\/\//i.test(trimmed) ||
+    /^(?:blob:|data:|https?:)/i.test(trimmed)
+  ) {
+    return trimmed;
+  }
 
   const base = baseUrl?.replace(/\/$/, '');
   if (!base) return PLACEHOLDER_IMAGE;
 
-  const filename = value.replace(/^\/images\//, '').replace(/^\//, '');
+  const filename = trimmed.replace(/^\/images\//, '').replace(/^\//, '');
   return `${base}/${filename}`;
 }

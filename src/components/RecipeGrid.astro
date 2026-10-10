@@ -5,9 +5,10 @@ import Pagination from './Pagination.astro';
 
 interface Props {
   page: RecipePage;
+  deletableRecipeIds?: ReadonlySet<string>;
 }
 
-const { page } = Astro.props;
+const { page, deletableRecipeIds = new Set<string>() } = Astro.props;
 ---
 
 <div id="recipeCards" class="mx-auto max-w-(--breakpoint-2xl)">
@@ -16,7 +17,10 @@ const { page } = Astro.props;
   ) : (
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {page.items.map(recipe => (
-        <RecipeCard recipe={recipe} />
+        <RecipeCard
+          recipe={recipe}
+          deletable={deletableRecipeIds.has(recipe.id)}
+        />
       ))}
     </div>
   )}

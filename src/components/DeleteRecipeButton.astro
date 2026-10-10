@@ -1,0 +1,95 @@
+---
+interface Props {
+  slug: string;
+  class?: string;
+}
+
+const { slug, class: className = '' } = Astro.props;
+---
+
+<button
+  type="button"
+  data-delete-recipe
+  data-recipe-slug={slug}
+  class={`hidden rounded-full border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950 ${className}`}
+>
+  Delete recipe
+</button>
+
+<script>
+  import { supabase } from '@/lib/supabase';
+
+  const buttons = document.querySelectorAll<HTMLButtonElement>(
+    'button[data-delete-recipe]'
+  );
+
+  for (const button of buttons) {
+    const recipeSlug = button.dataset.recipeSlug;
+
+    async function showDeleteOption() {
+      if (!supabase || !recipeSlug) return;
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Could not check recipe delete permissions:', error);
+        return;
+      }
+
+      if (session?.user.email?.toLowerCase() === 'kshitiz6000@gmail.com') {
+        button.classList.remove('hidden');
+      }
+    }
+
+    button.addEventListener('click', async () => {
+      if (!supabase || !recipeSlug) return;
+      if (!window.confirm('Delete this recipe? This cannot be undone.')) return;
+
+      button.disabled = true;
+      button.textContent = 'Deleting…';
+
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session?.access_token) {
+          throw new Error('Please log in again to delete this recipe.');
+        }
+
+        const response = await fetch(
+          `/api/recipes/${encodeURIComponent(recipeSlug)}`,
+          {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+        const result = (await response.json()) as {
+          ok?: boolean;
+          error?: string;
+        };
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || 'Could not delete the recipe.');
+        }
+
+        window.location.assign('/recipes');
+      } catch (error) {
+        console.error('Could not delete recipe:', error);
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : 'Could not delete the recipe.'
+        );
+        button.disabled = false;
+        button.textContent = 'Delete recipe';
+      }
+    });
+
+    void showDeleteOption();
+  }
+</script>

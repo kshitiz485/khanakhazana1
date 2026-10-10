@@ -23,7 +23,18 @@ const {
   sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 400px',
 } = Astro.props;
 
-const { src, fallbackSrc } = resolveRecipeImage(image);
+const isGoogleShareUrl = (() => {
+  try {
+    const url = new URL(image);
+    return url.protocol === 'https:' && url.hostname === 'share.google';
+  } catch {
+    return false;
+  }
+})();
+const { src: resolvedSrc, fallbackSrc } = resolveRecipeImage(
+  isGoogleShareUrl ? '' : image
+);
+const src = isGoogleShareUrl ? fallbackSrc : resolvedSrc;
 ---
 
 <img
@@ -37,12 +48,32 @@ const { src, fallbackSrc } = resolveRecipeImage(image);
   decoding="async"
   draggable={draggable}
   data-fallback={fallbackSrc}
+  data-google-image-share={isGoogleShareUrl ? image : undefined}
 />
 
 <script>
   document
     .querySelectorAll<HTMLImageElement>('img.recipe-img[data-fallback]')
     .forEach(img => {
+      const sharedUrl = img.dataset.googleImageShare;
+      if (sharedUrl) {
+        void fetch(`/api/resolve-image?url=${encodeURIComponent(sharedUrl)}`)
+          .then(async response => {
+            const result = (await response.json()) as {
+              ok: boolean;
+              url?: string;
+              error?: string;
+            };
+            if (!response.ok || !result.ok || !result.url) {
+              throw new Error(result.error || 'Could not resolve image URL.');
+            }
+            img.src = result.url;
+          })
+          .catch(error => {
+            console.error('Could not display Google-shared recipe image:', error);
+          });
+      }
+
       img.addEventListener('error', () => {
         const fallback = img.dataset.fallback;
         if (fallback && img.src !== fallback) {

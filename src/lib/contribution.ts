@@ -180,6 +180,79 @@ export interface ContributePayload {
 export type ParseResult =
   { ok: true; payload: ContributePayload } | { ok: false; message: string };
 
+const IMAGE_SUFFIXES = new Set([
+  'avif',
+  'bmp',
+  'gif',
+  'ico',
+  'jpeg',
+  'jpg',
+  'jfif',
+  'png',
+  'svg',
+  'webp',
+]);
+
+export function normalizeImageUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+
+  let normalized = value;
+  if (normalized.startsWith('http://')) {
+    normalized = 'https://' + normalized.slice('http://'.length);
+  } else if (normalized.startsWith('//')) {
+    normalized = 'https:' + normalized;
+  } else if (!/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(normalized)) {
+    const looksLikeHost = /^[\w.-]+(?:\.[\w.-]+)+(?:[/?#].*)?$/.test(normalized);
+    if (looksLikeHost) normalized = `https://${normalized}`;
+  }
+
+  try {
+    const url = new URL(normalized);
+    const hostname = url.hostname.toLowerCase();
+
+    if (hostname === 'drive.google.com' || hostname === 'docs.google.com') {
+      const idFromPath = url.pathname.match(/\/file\/d\/([^/]+)/)?.[1];
+      const idFromQuery = url.searchParams.get('id');
+      const fileId = idFromPath ?? idFromQuery;
+      if (fileId) {
+        return `https://drive.google.com/uc?export=view&id=${fileId}`;
+      }
+    }
+
+    return url.href;
+  } catch {
+    return normalized;
+  }
+}
+
+export function isLikelyImageUrl(raw: string): boolean {
+  const value = normalizeImageUrl(raw).trim();
+  if (!value) return true;
+
+  try {
+    const url = new URL(value);
+    if (!/^https?:$/i.test(url.protocol)) return false;
+    if (url.hostname.toLowerCase() === 'share.google') return true;
+
+    const path = url.pathname.toLowerCase();
+    const extension = path.split('.').pop();
+    if (extension && IMAGE_SUFFIXES.has(extension)) return true;
+
+    const hostname = url.hostname.toLowerCase();
+    return (
+      hostname.includes('images') ||
+      hostname.includes('img') ||
+      hostname.includes('cdn') ||
+      hostname.includes('usercontent') ||
+      hostname.includes('blob') ||
+      hostname.includes('drive.google.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Validate the submitted fields against CONTRIBUTE_FIELDS. */
 export function parseContribution(form: FormData): ParseResult {
   const values: Record<string, string | number | boolean | undefined> = {};
@@ -216,6 +289,18 @@ export function parseContribution(form: FormData): ParseResult {
     if (field.max !== undefined && raw.length > field.max) {
       return fail(`${field.label} must be at most ${field.max} characters.`);
     }
+
+    if (field.name === 'imageUrl') {
+      const normalized = normalizeImageUrl(raw);
+      if (!isLikelyImageUrl(normalized)) {
+        return fail(
+          'Image URL must point to a direct image file (for example: JPG, PNG, WebP, AVIF, GIF). Google Drive share links should be converted to a direct file URL.'
+        );
+      }
+      values[field.name] = normalized;
+      continue;
+    }
+
     values[field.name] = raw;
   }
 

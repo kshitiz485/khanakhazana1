@@ -195,7 +195,12 @@ const latest = listRecipes(supabaseRecipeCards, { perPage: 6 });
         {/* Grid */}
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {latest.items.map(recipe => (
-            <RecipeCard recipe={recipe} />
+            <RecipeCard
+              recipe={recipe}
+              deletable={supabaseRecipeCards.some(
+                communityRecipe => communityRecipe.id === recipe.id
+              )}
+            />
           ))}
         </div>
         {/* End Grid */}

@@ -100,6 +100,35 @@ describe('parseContribution', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it('accepts valid image URLs and rejects non-image share links', () => {
+    expect(
+      parseContribution(
+        formOf({ ...validFields, imageUrl: 'https://example.com/photo.jpg' })
+      )
+    ).toMatchObject({ ok: true, payload: { imageUrl: 'https://example.com/photo.jpg' } });
+
+    expect(
+      parseContribution(
+        formOf({ ...validFields, imageUrl: 'example.com/photo.jpg' })
+      )
+    ).toMatchObject({ ok: true, payload: { imageUrl: 'https://example.com/photo.jpg' } });
+
+    expect(
+      parseContribution(
+        formOf({ ...validFields, imageUrl: 'https://drive.google.com/file/d/abc123/view' })
+      )
+    ).toMatchObject({ ok: true, payload: { imageUrl: 'https://drive.google.com/uc?export=view&id=abc123' } });
+
+    expect(
+      parseContribution(
+        formOf({ ...validFields, imageUrl: 'https://share.google/cRWEpBrlEII5jRXjw' })
+      )
+    ).toMatchObject({
+      ok: true,
+      payload: { imageUrl: 'https://share.google/cRWEpBrlEII5jRXjw' },
+    });
+  });
+
   it('models servings and scalability independently', () => {
     expect(
       parseContribution(formOf({ ...validFields, servings: '4' }))

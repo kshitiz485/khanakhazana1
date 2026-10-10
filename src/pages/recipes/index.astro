@@ -60,6 +60,7 @@ const rows = dbRecipes.map(row => {
     },
   };
 });
+const deletableRecipeIds = new Set(rows.map(recipe => recipe.id));
 
 const recipes = listRecipes(rows, {
   page: requestedPage,
@@ -172,7 +173,7 @@ const pageDescription = `Explore our collection of ${recipes.totalItems} communi
         </div>
       </div>
     ) : (
-      <RecipeGrid page={recipes} />
+      <RecipeGrid page={recipes} deletableRecipeIds={deletableRecipeIds} />
     )}
   </div>
 
