@@ -1,9 +1,9 @@
 <div align="center">
-  <a href="https://openstove.org" target="_blank"><img src="src/icons/logo-readme.svg" alt="OpenStove Logo"/></a>
+  <a href="https://openstove.org" target="_blank"><img src="src/icons/logo-readme.svg" alt="Khana Khazana Logo"/></a>
 </div>
 <p>&nbsp;</p>
 
-**OpenStove** is a community recipe site where every recipe is a Markdown file in this repository. Readers get recipes with no ads, no fees, and no account – just the dish, scalable to any number of servings. Contributors add a recipe with a form or a pull request, and because both the code and the recipe text are open, anyone can fork the whole site and run their own.
+**Khana Khazana** is a community recipe site where every recipe is a Markdown file in this repository. Readers get recipes with no ads, no fees, and no account – just the dish, scalable to any number of servings. Contributors add a recipe with a form or a pull request, and because both the code and the recipe text are open, anyone can fork the whole site and run their own.
 
 Browse it live at [openstove.org](https://openstove.org).
 
@@ -134,19 +134,19 @@ Maintainers can edit recipes in a web UI instead of raw YAML:
 
 ## Deploying your own
 
-OpenStove is built for [Vercel](https://vercel.com/), using server rendering and serverless routes.
+Khana Khazana is built for [Vercel](https://vercel.com/), using server rendering and serverless routes.
 
 1. Fork and import this repository into Vercel.
 2. Create a public-read Vercel Blob store and connect it to the project.
 3. Upload your recipe photos with `pnpm upload:images` and set `PUBLIC_IMAGE_BASE_URL`.
-4. Set the contribute-form variables. All three are required in production:
+4. Apply the SQL migrations in `supabase/migrations`, then set the contribute-form variables:
    ```text
-   GITHUB_TOKEN               Fine-grained PAT with Issues: read and write
-   GITHUB_REPO                your-user/your-fork
+   PUBLIC_SUPABASE_URL        Supabase project URL
+   PUBLIC_SUPABASE_ANON_KEY   Supabase publishable/anon key
    TURNSTILE_SECRET_KEY       Cloudflare Turnstile secret (spam protection)
    PUBLIC_TURNSTILE_SITE_KEY  Cloudflare Turnstile site key
    ```
-   Locally, Turnstile is waived; only the GitHub variables are needed.
+   Recipes submitted through `/contribute` are published immediately. Locally, Turnstile is waived; the Supabase variables are still required.
 5. Set the Keystatic GitHub-app variables if you want the production CMS.
 6. Deploy the `main` branch, then check recipe images, `/contribute`, `/keystatic` and print output.
 

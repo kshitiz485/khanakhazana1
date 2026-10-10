@@ -27,8 +27,8 @@ const results = listRecipes(
 
 const canonicalUrl = '/recipes/search';
 const pageDescription = hasQuery
-  ? `Search results for "${query}" on OpenStove. Found ${results.totalItems} recipes.`
-  : 'Search recipes on OpenStove. Find your favorite dishes from our community-crafted collection.';
+  ? `Search results for "${query}" on Khana Khazana. Found ${results.totalItems} recipes.`
+  : 'Search recipes on Khana Khazana. Find your favorite dishes from our community-crafted collection.';
 
 const heading = hasQuery ? `Results for “${query}”` : 'Search recipes';
 
@@ -54,8 +54,8 @@ const emptyState = hasQuery
 <MainLayout
   title={
     hasQuery
-      ? `Search Results for "${query}" | OpenStove`
-      : 'Search | OpenStove'
+      ? `Search Results for "${query}" | Khana Khazana`
+      : 'Search | Khana Khazana'
   }
   description={pageDescription}
   canonicalUrl={canonicalUrl}

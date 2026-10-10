@@ -1,4 +1,4 @@
-# OpenStove
+# Khana Khazana
 
 A community recipe library. Recipes are Markdown files with YAML frontmatter, rendered by Astro; readers browse, search, scale and bookmark them; contributors submit new ones through a form or a pull request.
 

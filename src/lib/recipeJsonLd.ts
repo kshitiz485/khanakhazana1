@@ -25,7 +25,7 @@ export function recipeJsonLd(
     author: { '@type': 'Person', name: recipe.author || 'Anonymous' },
     publisher: {
       '@type': 'Organization',
-      name: 'OpenStove',
+      name: 'Khana Khazana',
       url: 'https://openstove.org',
     },
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },

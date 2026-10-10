@@ -39,8 +39,8 @@ const tagRecipes = listRecipes(byTag(await getCollection('recipes'), tag), {
 });
 
 const canonicalUrl = tagRecipes.pathFor(tagRecipes.page);
-const pageTitle = `${tagLabel(tag)} | OpenStove`;
-const pageDescription = `Browse ${tagRecipes.totalItems} ${tag} recipes on OpenStove. Discover community-crafted recipes for ${tag} dishes.`;
+const pageTitle = `${tagLabel(tag)} | Khana Khazana`;
+const pageDescription = `Browse ${tagRecipes.totalItems} ${tag} recipes on Khana Khazana. Discover community-crafted recipes for ${tag} dishes.`;
 ---
 
 <MainLayout

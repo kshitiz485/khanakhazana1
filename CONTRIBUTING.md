@@ -1,6 +1,6 @@
-# Contributing to OpenStove
+# Contributing to Khana Khazana
 
-Thank you for your interest in contributing to OpenStove! We value your contributions and aim to make the process seamless and understandable, whether you're submitting new recipes or suggesting improvements.
+Thank you for your interest in contributing to Khana Khazana! We value your contributions and aim to make the process seamless and understandable, whether you're submitting new recipes or suggesting improvements.
 
 ## Easy path: online form
 
@@ -13,10 +13,10 @@ In the form, ingredients are one per line as `quantity | unit | name` (or `quant
 To contribute via Git, please make sure you have:
 
 - A GitHub account. [Sign up here](https://github.com/signup) if you haven't yet.
-- Forked the OpenStove repository to your own account. Here's the [link to our repository](https://github.com/mearashadowfax/OpenStove).
+- Forked the Khana Khazana repository to your own account. Here's the [link to our repository](https://github.com/mearashadowfax/OpenStove).
 - If you're planning multiple contributions or prefer working locally, clone your fork.
 
-Familiarize yourself with [Markdown syntax](https://www.markdownguide.org/basic-syntax/) as each recipe on OpenStove is written in Markdown.
+Familiarize yourself with [Markdown syntax](https://www.markdownguide.org/basic-syntax/) as each recipe on Khana Khazana is written in Markdown.
 
 ## Recipe Format Guidelines
 
@@ -99,7 +99,7 @@ Please note that if you want to keep the field blank, keep the `""`. Also, pleas
 
 1. Commit your changes with a clear message describing your recipe, e.g., `git commit -m "Add Vegan Chocolate Cake recipe"`.
 2. Push the changes to your forked repository.
-3. Create a pull request against the main OpenStove repository.
+3. Create a pull request against the main Khana Khazana repository.
 4. Title your pull request and provide a summary of your recipe.
 
 ### Review and Merge
@@ -115,10 +115,10 @@ Take a look at our example recipes to get an idea of the format and style that w
 
 ## Community Guidelines
 
-OpenStove is dedicated to providing a welcoming and inclusive community. Please review our [Code of Conduct](https://github.com/mearashadowfax/OpenStove/blob/main/CODE_OF_CONDUCT.md) for guidelines on our community behavior.
+Khana Khazana is dedicated to providing a welcoming and inclusive community. Please review our [Code of Conduct](https://github.com/mearashadowfax/OpenStove/blob/main/CODE_OF_CONDUCT.md) for guidelines on our community behavior.
 
 ## Licensing
 
-By contributing recipe text to OpenStove, you agree to license that content under the same terms as the OpenStove project itself (CC BY-NC-SA 4.0). Photo rights remain separate unless you explicitly grant them.
+By contributing recipe text to Khana Khazana, you agree to license that content under the same terms as the Khana Khazana project itself (CC BY-NC-SA 4.0). Photo rights remain separate unless you explicitly grant them.
 
-Thank you for contributing to OpenStove and helping to create a rich repository of diverse and delicious recipes!
+Thank you for contributing to Khana Khazana and helping to create a rich repository of diverse and delicious recipes!

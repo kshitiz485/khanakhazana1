@@ -6,9 +6,15 @@ import {
   buildRecipeMarkdown,
   createContributionHandler,
   isContributionConfigured,
+  parseIngredients,
+  parseSteps,
   parseContribution,
   type ContributePayload,
 } from './contribution';
+import {
+  parseCommunityRecipeDetails,
+  serializeCommunityRecipeDetails,
+} from './communityRecipe';
 
 function formOf(fields: Record<string, string>): FormData {
   const form = new FormData();
@@ -51,18 +57,18 @@ describe('CONTRIBUTE_FIELDS', () => {
 });
 
 describe('isContributionConfigured', () => {
-  it('needs GitHub always and Turnstile only in production', () => {
-    const github = { GITHUB_TOKEN: 't', GITHUB_REPO: 'o/r' };
-    expect(isContributionConfigured({ ...github, PROD: false })).toBe(true);
-    expect(isContributionConfigured({ ...github, PROD: true })).toBe(false);
+  it('needs Supabase always and Turnstile only in production', () => {
+    const supabase = { SUPABASE_URL: 'url', SUPABASE_ANON_KEY: 'key' };
+    expect(isContributionConfigured({ ...supabase, PROD: false })).toBe(true);
+    expect(isContributionConfigured({ ...supabase, PROD: true })).toBe(false);
     expect(
       isContributionConfigured({
-        ...github,
+        ...supabase,
         PROD: true,
         TURNSTILE_SECRET_KEY: 's',
       })
     ).toBe(true);
-    expect(isContributionConfigured({ GITHUB_TOKEN: 't', PROD: false })).toBe(
+    expect(isContributionConfigured({ SUPABASE_URL: 'url', PROD: false })).toBe(
       false
     );
   });
@@ -186,18 +192,56 @@ describe('buildRecipeMarkdown', () => {
   });
 });
 
+describe('parse recipe steps and ingredients', () => {
+  it('preserves ingredient groups, quantities, and sectioned steps', () => {
+    expect(
+      parseIngredients('## Dressing\n1/2 | cup | olive oil\nSalt')
+    ).toEqual([
+      {
+        title: 'Dressing',
+        items: [
+          { quantity: '1/2', unit: 'cup', name: 'olive oil' },
+          { name: 'Salt' },
+        ],
+      },
+    ]);
+    expect(parseSteps('## Prep\nChop onions.\n## Cook\nSimmer.')).toEqual([
+      { title: 'Prep', actions: ['Chop onions.'] },
+      { title: 'Cook', actions: ['Simmer.'] },
+    ]);
+  });
+
+  describe('community recipe content', () => {
+    it('round-trips structured ingredients, steps, and notes through content', () => {
+      const details = {
+        ingredients: parseIngredients('## Dressing\n1/2 | cup | olive oil'),
+        steps: parseSteps('## Prep\nChop onions.\n## Cook\nSimmer.'),
+        recipeNotes: ['Add salt to taste.'],
+      };
+
+      expect(
+        parseCommunityRecipeDetails(serializeCommunityRecipeDetails(details))
+      ).toEqual(details);
+    });
+
+    it('treats legacy plain-text content as unstructured', () => {
+      expect(
+        parseCommunityRecipeDetails('Legacy recipe content')
+      ).toBeUndefined();
+    });
+  });
+});
+
 describe('createContributionHandler', () => {
   function setup(
     overrides: Partial<Parameters<typeof createContributionHandler>[0]> = {}
   ) {
     let time = 1_000_000;
-    const createIssue = vi.fn(async () => ({
-      url: 'https://github.com/o/r/issues/1',
-    }));
+    const createSubmission = vi.fn(async () => undefined);
     const verifyHuman = vi.fn(async () => true);
     const handle = createContributionHandler({
       verifyHuman,
-      createIssue,
+      createSubmission,
       now: () => time,
       ...overrides,
     });
@@ -207,41 +251,52 @@ describe('createContributionHandler', () => {
     ) => handle({ form: formOf(fields), ip, contentLength: 1000 });
     return {
       submit,
-      createIssue,
+      createSubmission,
       verifyHuman,
       advance: (ms: number) => (time += ms),
     };
   }
 
-  it('creates an issue for a valid submission', async () => {
-    const { submit, createIssue } = setup();
+  it('saves a review submission for a valid recipe', async () => {
+    const { submit, createSubmission } = setup();
     await expect(submit()).resolves.toEqual({
       ok: true,
       status: 200,
-      issueUrl: 'https://github.com/o/r/issues/1',
     });
-    expect(createIssue).toHaveBeenCalledWith({
-      title: 'Recipe submission: Creamy Tomato Soup!',
-      body: expect.stringContaining(
-        'src/content/recipes/creamy-tomato-soup.md'
-      ),
-    });
+    expect(createSubmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Creamy Tomato Soup!',
+        author: 'Alex',
+        description: 'A cozy weeknight soup.',
+        cookingTime: 35,
+        servings: 1,
+        scalable: true,
+        imageUrl: '',
+        imageAlt: 'Creamy Tomato Soup!',
+        ingredients: '2|cups|tomatoes\n1|tbsp|olive oil',
+        steps: '## Prep\nChop the tomatoes.\n## Cook\nSimmer until soft.',
+        notes: 'Add cream at the end.',
+        tags: ['soup', 'vegetarian'],
+      })
+    );
   });
 
   it('silently accepts honeypot submissions without creating an issue', async () => {
-    const { submit, createIssue, verifyHuman } = setup();
+    const { submit, createSubmission, verifyHuman } = setup();
     await expect(submit({ ...validFields, website: 'spam' })).resolves.toEqual({
       ok: true,
       status: 200,
     });
     expect(verifyHuman).not.toHaveBeenCalled();
-    expect(createIssue).not.toHaveBeenCalled();
+    expect(createSubmission).not.toHaveBeenCalled();
   });
 
   it('refuses when the human check fails', async () => {
-    const { submit, createIssue } = setup({ verifyHuman: async () => false });
+    const { submit, createSubmission } = setup({
+      verifyHuman: async () => false,
+    });
     await expect(submit()).resolves.toMatchObject({ ok: false, status: 400 });
-    expect(createIssue).not.toHaveBeenCalled();
+    expect(createSubmission).not.toHaveBeenCalled();
   });
 
   it('returns the field error for an invalid submission', async () => {
@@ -254,10 +309,10 @@ describe('createContributionHandler', () => {
   });
 
   it('rejects oversized bodies', async () => {
-    const { createIssue } = setup();
+    const { createSubmission } = setup();
     const handle = createContributionHandler({
       verifyHuman: async () => true,
-      createIssue,
+      createSubmission,
     });
     await expect(
       handle({ form: formOf(validFields), ip: null, contentLength: 200_000 })
@@ -277,17 +332,24 @@ describe('createContributionHandler', () => {
     await expect(submit()).resolves.toMatchObject({ ok: true });
   });
 
-  it('maps tracker failures to a 502 with an auth hint', async () => {
+  it('does not rate limit when disabled for local development', async () => {
+    const { submit } = setup({ rateLimitEnabled: false });
+    for (let i = 0; i < RATE_LIMIT_MAX + 2; i++) {
+      await expect(submit()).resolves.toMatchObject({ ok: true });
+    }
+  });
+
+  it('maps submission failures to a 502', async () => {
     const auth = setup({
-      createIssue: async () => ({ failed: true, status: 401 }),
+      createSubmission: async () => ({ failed: true, status: 401 }),
     });
     await expect(auth.submit()).resolves.toEqual({
       ok: false,
       status: 502,
-      message: 'Could not create GitHub issue (auth).',
+      message: 'Could not save your recipe submission.',
     });
     const other = setup({
-      createIssue: async () => ({ failed: true, status: 500 }),
+      createSubmission: async () => ({ failed: true, status: 500 }),
     });
     await expect(other.submit()).resolves.toMatchObject({
       status: 502,

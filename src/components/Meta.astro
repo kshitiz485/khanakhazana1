@@ -14,8 +14,8 @@ interface Props {
 
 const {
   url = Astro.url.href,
-  title = 'OpenStove',
-  description = 'Explore OpenStove, a curated collection of ad-free, community-shared recipes. Connect with cooking enthusiasts and contribute to our GitHub-hosted culinary repository. No fees, just the joy of cooking and sharing.',
+  title = 'Khana Khazana',
+  description = 'Explore Khana Khazana, a curated collection of ad-free, community-shared recipes. Connect with cooking enthusiasts and contribute to our GitHub-hosted culinary repository. No fees, just the joy of cooking and sharing.',
   robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   recipe,
 } = Astro.props;
@@ -40,15 +40,15 @@ const jsonLd = recipe
       name: pageTitle,
       headline: pageTitle,
       alternateName:
-        'OpenStove – A Curated Collection of Community-Crafted Recipes',
+        'Khana Khazana – A Curated Collection of Community-Crafted Recipes',
       description: pageDescription,
       image: pageImage,
       isPartOf: {
         '@type': 'WebSite',
         url: 'https://openstove.org',
-        name: 'OpenStove',
+        name: 'Khana Khazana',
         description:
-          'Explore OpenStove, a curated collection of ad-free, community-shared recipes. Connect with cooking enthusiasts and contribute to our GitHub-hosted culinary repository.',
+          'Explore Khana Khazana, a curated collection of ad-free, community-shared recipes. Connect with cooking enthusiasts and contribute to our GitHub-hosted culinary repository.',
       },
       inLanguage: 'en-US',
     };
@@ -75,7 +75,7 @@ const jsonLd = recipe
 <meta property="og:url" content={canonicalUrl} />
 <meta property="og:type" content={pageType} />
 <meta property="og:title" content={pageTitle} />
-<meta content="OpenStove" property="og:site_name" />
+<meta content="Khana Khazana" property="og:site_name" />
 <meta property="og:description" content={pageDescription} />
 <meta property="og:image" content={pageImage} />
 <meta content="1200" property="og:image:width" />

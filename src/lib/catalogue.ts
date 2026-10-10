@@ -120,6 +120,43 @@ export function searchRecipes(recipes: Recipe[], query: string): Recipe[] {
   return [...titleMatches, ...otherMatches];
 }
 
+export function relatedRecipes(
+  recipes: Recipe[],
+  currentId: string,
+  limit = 3
+): Recipe[] {
+  const current = recipes.find(recipe => recipe.id === currentId);
+  if (!current) return [];
+
+  const currentTags = new Set(
+    (current.data.tags ?? []).map(tag => tag.toLowerCase())
+  );
+
+  const matched = recipes
+    .filter(recipe => recipe.id !== currentId)
+    .map((recipe, index) => {
+      const sharedTagCount = (recipe.data.tags ?? []).filter(tag =>
+        currentTags.has(tag.toLowerCase())
+      ).length;
+      return { recipe, sharedTagCount, index };
+    })
+    .filter(item => item.sharedTagCount > 0)
+    .sort(
+      (a, b) => b.sharedTagCount - a.sharedTagCount || a.index - b.index
+    )
+    .map(({ recipe }) => recipe);
+
+  if (matched.length >= limit) {
+    return matched.slice(0, limit);
+  }
+
+  const fallback = recipes.filter(recipe => recipe.id !== currentId);
+  const seen = new Set(matched.map(recipe => recipe.id));
+  const remaining = fallback.filter(recipe => !seen.has(recipe.id));
+
+  return [...matched, ...remaining].slice(0, limit);
+}
+
 function searchableText(recipe: Recipe): string[] {
   const { data } = recipe;
   return [

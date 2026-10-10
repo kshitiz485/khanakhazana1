@@ -1,10 +1,10 @@
 /**
  * Contribution intake: a reader's recipe submission, from the form's
- * fields to a GitHub issue for maintainers.
+ * fields to the published recipe catalogue.
  *
  * One field table drives both the form and validation; the handler owns
- * spam checks, rate limiting, Markdown generation and the issue body.
- * The two things it cannot do itself (prove a human, create an issue)
+ * spam checks and rate limiting.
+ * The two things it cannot do itself (prove a human, publish a recipe)
  * are ports, so the route in production and the tests each plug in
  * their own adapters.
  */
@@ -147,15 +147,15 @@ export const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 // -------------------------------------------------------------- config
 
 export interface ContributionEnv {
-  GITHUB_TOKEN?: string;
-  GITHUB_REPO?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_ANON_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
   PROD: boolean;
 }
 
 /** True when the form can be submitted in this environment. Used by the form and the route. */
 export function isContributionConfigured(env: ContributionEnv): boolean {
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return false;
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return false;
   return !env.PROD || Boolean(env.TURNSTILE_SECRET_KEY);
 }
 
@@ -243,21 +243,21 @@ function fail(message: string): ParseResult {
 
 // ------------------------------------------------------------ markdown
 
-interface IngredientItem {
+export interface IngredientItem {
   quantity?: string;
   unit?: string;
   name: string;
 }
-interface IngredientGroup {
+export interface IngredientGroup {
   title?: string;
   items: IngredientItem[];
 }
-interface Step {
+export interface RecipeStep {
   title?: string;
   actions: string[];
 }
 
-function slugify(title: string): string {
+export function recipeSlug(title: string): string {
   return title
     .toLowerCase()
     .trim()
@@ -267,7 +267,7 @@ function slugify(title: string): string {
 }
 
 /** `## Title` starts a group; lines are `qty | unit | name`, `qty | name`, or a bare name. */
-function parseIngredients(raw: string): IngredientGroup[] {
+export function parseIngredients(raw: string): IngredientGroup[] {
   const groups: IngredientGroup[] = [];
   let current: IngredientGroup = { items: [] };
 
@@ -300,9 +300,9 @@ function parseIngredients(raw: string): IngredientGroup[] {
 }
 
 /** `## Title` starts a step; every other non-empty line is an action. */
-function parseSteps(raw: string): Step[] {
-  const steps: Step[] = [];
-  let current: Step = { actions: [] };
+export function parseSteps(raw: string): RecipeStep[] {
+  const steps: RecipeStep[] = [];
+  let current: RecipeStep = { actions: [] };
 
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
@@ -333,7 +333,7 @@ export function buildRecipeMarkdown(
   payload: ContributePayload,
   today: Date = new Date()
 ): { slug: string; markdown: string } {
-  const slug = slugify(payload.title) || 'untitled-recipe';
+  const slug = recipeSlug(payload.title) || 'untitled-recipe';
   const author = payload.author.trim() || 'anonymous';
   const tags = payload.tags
     .split(',')
@@ -402,12 +402,24 @@ cookingTime: ${payload.cookingTime}
 export interface ContributionPorts {
   /** Prove the submitter is human (Turnstile in production). */
   verifyHuman: (token: string, ip: string | null) => Promise<boolean>;
-  /** Open the review issue; `null` means the tracker refused. */
-  createIssue: (issue: {
+  /** Publish the submitted recipe. */
+  createSubmission: (submission: {
     title: string;
-    body: string;
-  }) => Promise<{ url?: string } | { failed: true; status: number }>;
+    imageUrl?: string;
+    imageAlt?: string;
+    author?: string;
+    description?: string;
+    cookingTime?: number;
+    servings?: number;
+    scalable?: boolean;
+    tags?: string[];
+    ingredients?: string;
+    steps?: string;
+    notes?: string;
+  }) => Promise<void | { failed: true; status: number }>;
   now?: () => number;
+  /** Rate limiting is only useful in production; disable it in local/dev. */
+  rateLimitEnabled?: boolean;
 }
 
 export interface ContributionSubmission {
@@ -417,7 +429,7 @@ export interface ContributionSubmission {
 }
 
 export type ContributionResult =
-  | { ok: true; status: 200; issueUrl?: string }
+  | { ok: true; status: 200 }
   | { ok: false; status: 400 | 413 | 429 | 502; message: string };
 
 /**
@@ -426,8 +438,9 @@ export type ContributionResult =
  */
 export function createContributionHandler({
   verifyHuman,
-  createIssue,
+  createSubmission,
   now = Date.now,
+  rateLimitEnabled = true,
 }: ContributionPorts): (
   submission: ContributionSubmission
 ) => Promise<ContributionResult> {
@@ -446,7 +459,7 @@ export function createContributionHandler({
   }
 
   return async ({ form, ip, contentLength }) => {
-    if (!withinRateLimit(ip ?? 'unknown')) {
+    if (rateLimitEnabled && !withinRateLimit(ip ?? 'unknown')) {
       return refuse(429, 'Too many submissions. Please try again later.');
     }
     if (contentLength > MAX_BODY_BYTES) {
@@ -462,24 +475,34 @@ export function createContributionHandler({
     const parsed = parseContribution(form);
     if (!parsed.ok) return refuse(400, parsed.message);
 
-    const { slug, markdown } = buildRecipeMarkdown(
-      parsed.payload,
-      new Date(now())
-    );
-    const issue = await createIssue({
-      title: `Recipe submission: ${parsed.payload.title}`,
-      body: issueBody(slug, markdown),
+    const submission = await createSubmission({
+      title: parsed.payload.title,
+      imageUrl: parsed.payload.imageUrl?.trim(),
+      imageAlt: parsed.payload.title.trim(),
+      author: parsed.payload.author.trim() || 'anonymous',
+      description: parsed.payload.description.trim(),
+      cookingTime: parsed.payload.cookingTime,
+      servings: parsed.payload.servings,
+      scalable: parsed.payload.scalable,
+      tags: parsed.payload.tags
+        .split(',')
+        .map(tag => tag.trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, MAX_TAGS),
+      ingredients: parsed.payload.ingredients.trim(),
+      steps: parsed.payload.steps.trim(),
+      notes: parsed.payload.notes.trim(),
     });
 
-    if ('failed' in issue) {
+    if (submission && 'failed' in submission) {
       return refuse(
         502,
-        issue.status === 401 || issue.status === 403
-          ? 'Could not create GitHub issue (auth).'
-          : 'Could not create GitHub issue. Please try again later.'
+        submission.status === 401 || submission.status === 403
+          ? 'Could not save your recipe submission.'
+          : 'Could not save your recipe submission. Please try again later.'
       );
     }
-    return { ok: true, status: 200, issueUrl: issue.url };
+    return { ok: true, status: 200 };
   };
 }
 
@@ -488,23 +511,4 @@ function refuse(
   message: string
 ): ContributionResult {
   return { ok: false, status, message };
-}
-
-function issueBody(slug: string, markdown: string): string {
-  return [
-    '## Recipe submission via /contribute',
-    '',
-    `**Suggested filename:** \`src/content/recipes/${slug}.md\``,
-    '',
-    '### Review checklist',
-    '- [ ] Validate ingredients / steps',
-    '- [ ] Add licensed photo to CDN and set `image` filename',
-    '- [ ] Merge into content collection',
-    '',
-    '### Generated Markdown',
-    '',
-    '```markdown',
-    markdown,
-    '```',
-  ].join('\n');
 }

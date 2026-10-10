@@ -6,6 +6,7 @@ import {
   listRecipes,
   parsePage,
   queryPaging,
+  relatedRecipes,
   searchRecipes,
   segmentPaging,
   type Recipe,
@@ -136,5 +137,31 @@ describe('searchRecipes', () => {
   it('matches nothing below the minimum query length', () => {
     expect(searchRecipes(all, 's')).toEqual([]);
     expect(searchRecipes(all, '  ')).toEqual([]);
+  });
+});
+
+describe('relatedRecipes', () => {
+  it('prefers recipes with matching tags before falling back to newest others', () => {
+    const mushroomRisotto = recipe('mushroom-risotto', '2024-04-01', {
+      tags: ['italian', 'dinner'],
+    });
+    const pastaSalad = recipe('pasta-salad', '2024-05-01', {
+      tags: ['italian', 'salad'],
+    });
+    const pumpkinSoup = recipe('pumpkin-soup', '2024-06-01', {
+      tags: ['soup'],
+    });
+
+    expect(
+      relatedRecipes([mushroomRisotto, pastaSalad, pumpkinSoup], 'mushroom-risotto', 3).map(
+        r => r.id
+      )
+    ).toEqual(['pasta-salad', 'pumpkin-soup']);
+
+    expect(
+      relatedRecipes([mushroomRisotto, pastaSalad, pumpkinSoup], 'pumpkin-soup', 3).map(
+        r => r.id
+      )
+    ).toEqual(['mushroom-risotto', 'pasta-salad']);
   });
 });

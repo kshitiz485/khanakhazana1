@@ -1,24 +1,77 @@
 ---
-export const prerender = true;
+export const prerender = false;
 import MainLayout from '@layouts/MainLayout.astro';
 import FAQ from '@components/FAQ.astro';
 import RecipeCard from '@components/RecipeCard.astro';
 import { Image } from 'astro:assets';
 import heroImage from '@images/hero-image.svg';
 import { Icon } from 'astro-icon/components';
-import { getCollection } from 'astro:content';
 import { listRecipes } from '@/lib/catalogue';
+import { parseCommunityRecipeDetails } from '@/lib/communityRecipe';
+import { supabase } from '@/lib/supabase';
 
-const latest = listRecipes(await getCollection('recipes'), { perPage: 6 });
+const dbRecipes =
+  supabase &&
+  import.meta.env.PUBLIC_SUPABASE_URL &&
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+    ? ((
+        await supabase
+          .from('recipes')
+          .select('*')
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+          .limit(6)
+      ).data ?? [])
+    : [];
+
+const supabaseRecipeCards = dbRecipes.map(row => {
+  const details = parseCommunityRecipeDetails(row.content || '');
+  return {
+    id: row.slug ?? row.id,
+    collection: 'recipes' as const,
+    data: {
+      title: row.title || 'Untitled recipe',
+      description: row.description || 'Community-submitted recipe.',
+      pubDate: new Date(row.created_at || Date.now()),
+      cookingTime: Number(row.cooking_time || 0),
+      image: row.image_url || '',
+      imageAlt: row.image_alt || row.title || 'Recipe image',
+      author: row.author || 'community',
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      steps:
+        Array.isArray(row.steps) && row.steps.length > 0
+          ? row.steps
+          : (details?.steps ?? [
+              {
+                title: '',
+                actions: [
+                  row.content || 'Submitted from the community recipe form.',
+                ],
+              },
+            ]),
+      ingredients:
+        Array.isArray(row.ingredients) && row.ingredients.length > 0
+          ? row.ingredients
+          : (details?.ingredients ?? [
+              { items: [{ name: 'Community recipe' }] },
+            ]),
+      recipeNotes: Array.isArray(row.recipe_notes)
+        ? row.recipe_notes
+        : (details?.recipeNotes ?? []),
+    },
+  };
+});
+
+const latest = listRecipes(supabaseRecipeCards, { perPage: 6 });
 ---
 
-<MainLayout title="OpenStove" canonicalUrl="/">
+<MainLayout title="Khana Khazana" canonicalUrl="/">
   {/*Hero Section*/}
   <section class="flex flex-col justify-between gap-6 pt-28 sm:gap-10 sm:pt-40 md:gap-16 lg:flex-row lg:pt-16 xl:gap-x-3 xl:pt-12 2xl:pt-10">
     {/* Content Start */}
     <div class="flex flex-col justify-center sm:text-center lg:py-12 lg:text-left xl:py-16 2xl:py-24">
       <h1 class="from-brand-warm to-brand-gold dark:from-primary-accent-dark dark:to-primary mb-3 bg-linear-to-r bg-clip-text text-4xl/[1.2] font-bold text-balance text-transparent sm:text-5xl/[1.2] md:mb-6 md:text-6xl/[1.2]">
-        OpenStove – your open source recipe library
+        Khana Khazana – your open source recipe library
       </h1>
 
       <p class="mb-8 leading-relaxed text-pretty text-stone-600 md:mb-12 md:text-lg lg:w-4/5 2xl:text-xl dark:text-stone-400">
@@ -90,8 +143,8 @@ const latest = listRecipes(await getCollection('recipes'), { perPage: 6 });
 
           <div class="mx-auto mt-5 max-w-(--breakpoint-md)">
             <p class="mx-auto max-w-(--breakpoint-md) text-lg text-pretty text-stone-600 2xl:text-xl dark:text-stone-200">
-              OpenStove is a home of culinary exploration and shared passion for
-              cooking. Browse, enjoy, and become part of our flavor-filled
+              Khana Khazana is a home of culinary exploration and shared passion
+              for cooking. Browse, enjoy, and become part of our flavor-filled
               community by contributing your culinary art. No frills; just the
               essence of cooking.
             </p>
@@ -99,13 +152,11 @@ const latest = listRecipes(await getCollection('recipes'), { perPage: 6 });
           {/* Button Start*/}
           <div class="mt-8 flex justify-center gap-3">
             <a
-              class="bg-secondary-accent text-on-brand hover:bg-secondary hover:shadow-secondary focus-visible:ring-secondary corner-squircle inline-flex items-center justify-center gap-x-3 rounded-4xl border border-transparent px-4 py-3 text-center text-sm font-medium transition duration-300 hover:shadow-2xl focus:outline-hidden focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:outline-hidden 2xl:text-base"
-              href="https://github.com/mearashadowfax/OpenStove"
-              target="_blank"
-              rel="noopener noreferrer"
+              class="bg-secondary-accent text-on-brand hover:bg-secondary hover:shadow-secondary focus-visible:ring-secondary corner-squircle inline-flex items-center justify-center rounded-4xl border border-transparent px-4 py-3 text-center text-sm font-medium transition duration-300 hover:shadow-2xl focus:outline-hidden focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:outline-hidden 2xl:text-base"
+              href="/contribute"
+              data-astro-prefetch
             >
-              <Icon name="github-body" class="h-4 w-4" />
-              Contribute with GitHub
+              Contribute
             </a>
           </div>
           {/* End Button */}
@@ -117,37 +168,63 @@ const latest = listRecipes(await getCollection('recipes'), { perPage: 6 });
 
   {/* Recipe Cards Blog */}
   <div id="recipeCards" class="mx-auto max-w-(--breakpoint-2xl) py-10 lg:py-14">
-    {/* Grid */}
-    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {latest.items.map(recipe => (
-        <RecipeCard recipe={recipe} />
-      ))}
-    </div>
-    {/* End Grid */}
+    {latest.items.length === 0 ? (
+      <div class="mx-auto max-w-2xl rounded-[40px] border border-dashed border-stone-300 bg-stone-50 px-6 py-12 text-center dark:border-stone-700 dark:bg-stone-900/40">
+        <p class="text-sm font-medium uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">
+          Community kitchen
+        </p>
+        <h3 class="mt-4 text-3xl font-bold text-stone-900 dark:text-stone-100">
+          No recipes yet
+        </h3>
+        <p class="mt-4 text-lg text-stone-600 dark:text-stone-300">
+          Be the first to share a favorite dish with the Khana Khazana
+          community.
+        </p>
+        <div class="mt-8 flex justify-center">
+          <a
+            class="bg-secondary-accent text-on-brand hover:bg-secondary focus-visible:ring-secondary corner-squircle inline-flex items-center justify-center rounded-4xl px-6 py-3 text-sm font-medium transition duration-300 focus:outline-hidden focus-visible:ring-2 2xl:text-base"
+            href="/contribute"
+            data-astro-prefetch
+          >
+            Share your recipe
+          </a>
+        </div>
+      </div>
+    ) : (
+      <>
+        {/* Grid */}
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {latest.items.map(recipe => (
+            <RecipeCard recipe={recipe} />
+          ))}
+        </div>
+        {/* End Grid */}
 
-    {/* Explore More Button */}
-    <div class="mt-12 text-center">
-      <a
-        class="text-md group bg-secondary-accent text-on-brand hover:bg-secondary focus-visible:ring-secondary corner-squircle inline-flex min-w-64 items-center justify-center gap-x-1 rounded-4xl px-4 py-3 font-medium transition-colors duration-300 focus-visible:ring-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 2xl:text-lg dark:border-stone-700 dark:bg-stone-700/60 dark:text-stone-300 dark:hover:bg-stone-700 dark:focus:outline-hidden"
-        href="/recipes"
-        data-astro-prefetch
-      >
-        Explore more
-        <svg
-          class="h-5 w-5 transition ease-in-out group-hover:translate-x-1"
-          fill="currentColor"
-          viewBox="0 0 20 20"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            clip-rule="evenodd"
-            d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
-            fill-rule="evenodd"
-          ></path>
-        </svg>
-      </a>
-    </div>
-    {/* End Explore More Button */}
+        {/* Explore More Button */}
+        <div class="mt-12 text-center">
+          <a
+            class="text-md group bg-secondary-accent text-on-brand hover:bg-secondary focus-visible:ring-secondary corner-squircle inline-flex min-w-64 items-center justify-center gap-x-1 rounded-4xl px-4 py-3 font-medium transition-colors duration-300 focus-visible:ring-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50 2xl:text-lg dark:border-stone-700 dark:bg-stone-700/60 dark:text-stone-300 dark:hover:bg-stone-700 dark:focus:outline-hidden"
+            href="/recipes"
+            data-astro-prefetch
+          >
+            Explore more
+            <svg
+              class="h-5 w-5 transition ease-in-out group-hover:translate-x-1"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                clip-rule="evenodd"
+                d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
+                fill-rule="evenodd"
+              ></path>
+            </svg>
+          </a>
+        </div>
+        {/* End Explore More Button */}
+      </>
+    )}
   </div>
   {/* End Cards Blog */}
 
@@ -171,7 +248,7 @@ const latest = listRecipes(await getCollection('recipes'), { perPage: 6 });
                 </h2>
 
                 <p class="text-center leading-relaxed text-pretty text-stone-600 sm:text-lg md:text-left 2xl:text-xl dark:text-stone-400">
-                  OpenStove is more than just a recipe site – it's an
+                  Khana Khazana is more than just a recipe site – it's an
                   open-source collaboration where every dish you find here is a
                   gift from fellow food lovers. Have a favorite recipe you'd
                   like to share? We welcome you to add your special touch to our

@@ -1,0 +1,108 @@
+---
+import FormField from './FormField.astro';
+import type { ContributeField } from '@/lib/contribution';
+
+interface Props {
+  field: ContributeField;
+}
+
+const { field } = Astro.props;
+const numberButtonClass =
+  'focus-visible:ring-secondary last:corner-squircle text-dark inline-flex h-10 w-10 touch-manipulation items-center justify-center bg-transparent text-sm font-medium transition duration-300 last:rounded-e-4xl hover:bg-orange-100 focus:outline-hidden focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50 dark:text-stone-200 dark:hover:bg-stone-800';
+---
+
+{field.kind === 'checkbox' ? (
+  <div class="sm:pt-7">
+    <label class="text-dark flex items-center gap-3 text-sm font-medium dark:text-stone-200">
+      <input
+        id={field.name}
+        name={field.name}
+        type="checkbox"
+        class="accent-secondary h-4 w-4"
+      />
+      {field.label}
+    </label>
+    {field.description && (
+      <p class="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+        {field.description}
+      </p>
+    )}
+  </div>
+) : (
+  <FormField
+    label={field.label}
+    for={field.name}
+    required={field.required}
+    description={field.description}
+  >
+    {field.kind === 'textarea' ? (
+      <textarea
+        class:list={['form-control', field.mono && 'font-mono text-sm']}
+        id={field.name}
+        name={field.name}
+        required={field.required}
+        rows={field.rows}
+        maxlength={field.max}
+        placeholder={field.placeholder}
+      ></textarea>
+    ) : field.kind === 'number' ? (
+      <div
+        class="corner-squircle max-w-48 rounded-4xl border border-orange-200 bg-white dark:border-stone-600 dark:bg-stone-900"
+        data-hs-input-number={JSON.stringify({
+          min: field.min,
+          max: field.max,
+        })}
+      >
+        <div class="flex w-full items-center justify-between gap-x-1">
+          <div class="grow px-3 py-2">
+            <input
+              class="text-dark w-full [appearance:textfield] border-0 bg-transparent p-0 focus:ring-0 disabled:opacity-50 dark:text-stone-100 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              id={field.name}
+              name={field.name}
+              type="number"
+              value={field.defaultValue}
+              min={field.min}
+              max={field.max}
+              required={field.required}
+              aria-roledescription="Number field"
+              data-hs-input-number-input
+            />
+          </div>
+          <div class="flex items-center divide-x divide-orange-200 border-s border-orange-200 dark:divide-stone-600 dark:border-stone-600">
+            <button
+              type="button"
+              class={numberButtonClass}
+              aria-label="Decrease"
+              data-hs-input-number-decrement
+            >
+              <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class={numberButtonClass}
+              aria-label="Increase"
+              data-hs-input-number-increment
+            >
+              <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <input
+        class="form-control"
+        id={field.name}
+        name={field.name}
+        type={field.kind}
+        required={field.required}
+        maxlength={field.max}
+        placeholder={field.placeholder}
+      />
+    )}
+  </FormField>
+)}

@@ -1,30 +1,35 @@
 ---
 import MainLayout from '@layouts/MainLayout.astro';
-import FormField from '@components/form/FormField.astro';
+import ContributionField from '@components/form/ContributionField.astro';
 
 export const prerender = false;
 
-import {
-  CONTRIBUTE_FIELDS,
-  HONEYPOT_FIELD,
-  isContributionConfigured,
-} from '@/lib/contribution';
-
-const numberButtonClass =
-  'focus-visible:ring-secondary last:corner-squircle text-dark inline-flex h-10 w-10 touch-manipulation items-center justify-center bg-transparent text-sm font-medium transition duration-300 last:rounded-e-4xl hover:bg-orange-100 focus:outline-hidden focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50 dark:text-stone-200 dark:hover:bg-stone-800';
+import { CONTRIBUTE_FIELDS, HONEYPOT_FIELD } from '@/lib/contribution';
 
 const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '';
-const formConfigured = isContributionConfigured({
-  GITHUB_TOKEN: import.meta.env.GITHUB_TOKEN,
-  GITHUB_REPO: import.meta.env.GITHUB_REPO,
-  TURNSTILE_SECRET_KEY: import.meta.env.TURNSTILE_SECRET_KEY,
-  PROD: import.meta.env.PROD,
-});
+const formConfigured = Boolean(
+  import.meta.env.PUBLIC_SUPABASE_URL &&
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+);
+
+const essentialFields = CONTRIBUTE_FIELDS.filter(field =>
+  [
+    'title',
+    'description',
+    'cookingTime',
+    'servings',
+    'ingredients',
+    'steps',
+  ].includes(field.name)
+);
+const optionalFields = CONTRIBUTE_FIELDS.filter(
+  field => !essentialFields.includes(field)
+);
 ---
 
 <MainLayout
-  title="Contribute a Recipe | OpenStove"
-  description="Share your recipe with the OpenStove community via an easy online form."
+  title="Contribute a Recipe | Khana Khazana"
+  description="Share your recipe with the Khana Khazana community via an easy online form."
   robots="noindex, follow"
 >
   <section class="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:py-20">
@@ -32,29 +37,8 @@ const formConfigured = isContributionConfigured({
       Contribute a recipe
     </h1>
     <p class="mt-4 text-stone-600 2xl:text-lg dark:text-stone-400">
-      Submit a recipe for review. We'll turn it into Markdown, add a licensed
-      photo when needed, and publish it on OpenStove. Prefer Git?{' '}
-      <a
-        class="text-dark dark:hover:text-primary underline decoration-2 underline-offset-2 hover:text-orange-600 dark:text-stone-200"
-        href="https://github.com/mearashadowfax/OpenStove/blob/main/CONTRIBUTING.md"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Open a pull request
-      </a>{' '}
-      instead.
+      Add your recipe details and it will be published for the community.
     </p>
-
-    {!formConfigured && (
-      <p
-        class="corner-squircle mt-6 rounded-4xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-100"
-        role="status"
-      >
-        Form submission is not configured on this environment yet (GITHUB_TOKEN
-        / GITHUB_REPO, plus TURNSTILE_SECRET_KEY in production). You can still
-        use the GitHub PR flow.
-      </p>
-    )}
 
     <form
       id="contribute-form"
@@ -63,129 +47,28 @@ const formConfigured = isContributionConfigured({
       action="/api/contribute"
     >
       <div class="grid gap-6 sm:grid-cols-2">
-        {CONTRIBUTE_FIELDS.map(field => (
+        {essentialFields.map(field => (
           <div class:list={[field.width === 'half' ? '' : 'sm:col-span-2']}>
-            {field.kind === 'checkbox' ? (
-              <div class="sm:pt-7">
-                <label class="text-dark flex items-center gap-3 text-sm font-medium dark:text-stone-200">
-                  <input
-                    id={field.name}
-                    name={field.name}
-                    type="checkbox"
-                    class="accent-secondary h-4 w-4"
-                  />
-                  {field.label}
-                </label>
-                {field.description && (
-                  <p class="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
-                    {field.description}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <FormField
-                label={field.label}
-                for={field.name}
-                required={field.required}
-                description={field.description}
-              >
-                {field.kind === 'textarea' ? (
-                  <textarea
-                    class:list={[
-                      'form-control',
-                      field.mono && 'font-mono text-sm',
-                    ]}
-                    id={field.name}
-                    name={field.name}
-                    required={field.required}
-                    rows={field.rows}
-                    maxlength={field.max}
-                    placeholder={field.placeholder}
-                  ></textarea>
-                ) : field.kind === 'number' ? (
-                  <div
-                    class="corner-squircle max-w-48 rounded-4xl border border-orange-200 bg-white dark:border-stone-600 dark:bg-stone-900"
-                    data-hs-input-number={JSON.stringify({
-                      min: field.min,
-                      max: field.max,
-                    })}
-                  >
-                    <div class="flex w-full items-center justify-between gap-x-1">
-                      <div class="grow px-3 py-2">
-                        <input
-                          class="text-dark w-full [appearance:textfield] border-0 bg-transparent p-0 focus:ring-0 disabled:opacity-50 dark:text-stone-100 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          id={field.name}
-                          name={field.name}
-                          type="number"
-                          value={field.defaultValue}
-                          min={field.min}
-                          max={field.max}
-                          required={field.required}
-                          aria-roledescription="Number field"
-                          data-hs-input-number-input
-                        />
-                      </div>
-                      <div class="flex items-center divide-x divide-orange-200 border-s border-orange-200 dark:divide-stone-600 dark:border-stone-600">
-                        <button
-                          type="button"
-                          class={numberButtonClass}
-                          aria-label="Decrease"
-                          data-hs-input-number-decrement
-                        >
-                          <svg
-                            class="h-3.5 w-3.5 shrink-0"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M5 12h14" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          class={numberButtonClass}
-                          aria-label="Increase"
-                          data-hs-input-number-increment
-                        >
-                          <svg
-                            class="h-3.5 w-3.5 shrink-0"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M5 12h14" />
-                            <path d="M12 5v14" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <input
-                    class="form-control"
-                    id={field.name}
-                    name={field.name}
-                    type={field.kind}
-                    required={field.required}
-                    maxlength={field.max}
-                    placeholder={field.placeholder}
-                  />
-                )}
-              </FormField>
-            )}
+            <ContributionField field={field} />
           </div>
         ))}
       </div>
+
+      <details class="group rounded-3xl border border-orange-200/80 bg-orange-50/50 px-5 py-4 dark:border-stone-700 dark:bg-stone-900/40">
+        <summary class="cursor-pointer list-none font-semibold text-stone-700 marker:hidden dark:text-stone-200">
+          Optional details
+          <span class="float-right text-xl leading-5 text-orange-500 transition group-open:rotate-45">
+            +
+          </span>
+        </summary>
+        <div class="mt-5 grid gap-6 sm:grid-cols-2">
+          {optionalFields.map(field => (
+            <div class:list={[field.width === 'half' ? '' : 'sm:col-span-2']}>
+              <ContributionField field={field} />
+            </div>
+          ))}
+        </div>
+      </details>
 
       {/* Honeypot */}
       <div class="hidden" aria-hidden="true">
@@ -215,24 +98,19 @@ const formConfigured = isContributionConfigured({
       ></p>
 
       <div class="flex flex-wrap items-center gap-3">
-        <a
-          id="form-result-link"
-          class="bg-primary text-dark hover:bg-primary-accent-light focus-visible:ring-primary corner-squircle hidden w-fit items-center justify-center rounded-4xl px-5 py-2.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          View submission on GitHub
-        </a>
-
         <button
           type="submit"
           id="contribute-submit"
           disabled={!formConfigured}
           class="bg-secondary text-dark hover:bg-secondary-accent focus-visible:ring-secondary corner-squircle inline-flex items-center justify-center rounded-4xl px-5 py-2.5 font-medium transition-colors focus-visible:ring-2 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Submit for review
+          Publish recipe
         </button>
+        {!formConfigured && (
+          <span class="text-xs text-stone-500 dark:text-stone-400">
+            Online submission is currently unavailable.
+          </span>
+        )}
       </div>
     </form>
   </section>
@@ -255,17 +133,12 @@ const formConfigured = isContributionConfigured({
   const submitBtn = document.getElementById(
     'contribute-submit'
   ) as HTMLButtonElement | null;
-  const resultLink = document.getElementById(
-    'form-result-link'
-  ) as HTMLAnchorElement | null;
 
   form?.addEventListener('submit', async event => {
     event.preventDefault();
     if (!form || !statusEl || !submitBtn) return;
 
     statusEl.classList.add('hidden');
-    resultLink?.classList.add('hidden');
-    resultLink?.classList.remove('inline-flex');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting…';
 
@@ -274,7 +147,7 @@ const formConfigured = isContributionConfigured({
         method: 'POST',
         body: new FormData(form),
       });
-      let data: { ok?: boolean; error?: string; url?: string } = {};
+      let data: { ok?: boolean; error?: string } = {};
       try {
         data = await response.json();
       } catch {
@@ -285,23 +158,17 @@ const formConfigured = isContributionConfigured({
         throw new Error(data.error || 'Submission failed. Please try again.');
       }
 
-      statusEl.textContent = 'Thanks! Your recipe was submitted for review.';
+      statusEl.textContent = 'Thanks! Your recipe has been published.';
       statusEl.className = 'text-sm text-green-700 dark:text-green-400';
-      if (data.url && resultLink) {
-        resultLink.href = data.url;
-        resultLink.classList.remove('hidden');
-        resultLink.classList.add('inline-flex');
-      }
       form.reset();
+      window.location.href = '/';
     } catch (error) {
-      resultLink?.classList.add('hidden');
-      resultLink?.classList.remove('inline-flex');
       statusEl.textContent =
         error instanceof Error ? error.message : 'Something went wrong.';
       statusEl.className = 'text-sm text-red-700 dark:text-red-400';
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit for review';
+      submitBtn.textContent = 'Publish recipe';
     }
   });
 </script>

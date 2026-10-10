@@ -2,13 +2,66 @@
 import MainLayout from '@layouts/MainLayout.astro';
 import RecipeGrid from '@components/RecipeGrid.astro';
 import { Icon } from 'astro-icon/components';
-import { getCollection } from 'astro:content';
 import { listRecipes, parsePage, queryPaging } from '@/lib/catalogue';
+import { parseCommunityRecipeDetails } from '@/lib/communityRecipe';
+import { supabase } from '@/lib/supabase';
 
 export const prerender = false;
 
 const requestedPage = parsePage(Astro.url.searchParams.get('page'));
-const recipes = listRecipes(await getCollection('recipes'), {
+
+const dbRecipes =
+  supabase &&
+  import.meta.env.PUBLIC_SUPABASE_URL &&
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+    ? ((
+        await supabase
+          .from('recipes')
+          .select('*')
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+      ).data ?? [])
+    : [];
+
+const rows = dbRecipes.map(row => {
+  const details = parseCommunityRecipeDetails(row.content || '');
+  return {
+    id: row.slug ?? row.id,
+    collection: 'recipes' as const,
+    data: {
+      title: row.title || 'Untitled recipe',
+      description: row.description || 'Community-submitted recipe.',
+      pubDate: new Date(row.created_at || Date.now()),
+      cookingTime: Number(row.cooking_time || 0),
+      image: row.image_url || '',
+      imageAlt: row.image_alt || row.title || 'Recipe image',
+      author: row.author || 'community',
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      steps:
+        Array.isArray(row.steps) && row.steps.length > 0
+          ? row.steps
+          : (details?.steps ?? [
+              {
+                title: '',
+                actions: [
+                  row.content || 'Submitted from the community recipe form.',
+                ],
+              },
+            ]),
+      ingredients:
+        Array.isArray(row.ingredients) && row.ingredients.length > 0
+          ? row.ingredients
+          : (details?.ingredients ?? [
+              { items: [{ name: 'Community recipe' }] },
+            ]),
+      recipeNotes: Array.isArray(row.recipe_notes)
+        ? row.recipe_notes
+        : (details?.recipeNotes ?? []),
+    },
+  };
+});
+
+const recipes = listRecipes(rows, {
   page: requestedPage,
   pathFor: queryPaging('/recipes'),
 });
@@ -23,7 +76,7 @@ const pageDescription = `Explore our collection of ${recipes.totalItems} communi
 ---
 
 <MainLayout
-  title="Recipes | OpenStove"
+  title="Recipes | Khana Khazana"
   description={pageDescription}
   canonicalUrl={canonicalUrl}
 >
@@ -97,7 +150,30 @@ const pageDescription = `Explore our collection of ${recipes.totalItems} communi
 
   {/* Recipe Cards */}
   <div class="py-10 lg:py-14">
-    <RecipeGrid page={recipes} />
+    {recipes.items.length === 0 ? (
+      <div class="mx-auto max-w-2xl rounded-[40px] border border-dashed border-stone-300 bg-stone-50 px-6 py-12 text-center dark:border-stone-700 dark:bg-stone-900/40">
+        <p class="text-sm font-medium uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">
+          Community kitchen
+        </p>
+        <h2 class="mt-4 text-3xl font-bold text-stone-900 dark:text-stone-100">
+          No recipes yet
+        </h2>
+        <p class="mt-4 text-lg text-stone-600 dark:text-stone-300">
+          Share your favorite dish and help build the collection.
+        </p>
+        <div class="mt-8 flex justify-center">
+          <a
+            class="bg-secondary-accent text-on-brand hover:bg-secondary focus-visible:ring-secondary corner-squircle inline-flex items-center justify-center rounded-4xl px-6 py-3 text-sm font-medium transition duration-300 focus:outline-hidden focus-visible:ring-2 2xl:text-base"
+            href="/contribute"
+            data-astro-prefetch
+          >
+            Share your recipe
+          </a>
+        </div>
+      </div>
+    ) : (
+      <RecipeGrid page={recipes} />
+    )}
   </div>
 
   {/* Community Card*/}
@@ -117,8 +193,8 @@ const pageDescription = `Explore our collection of ${recipes.totalItems} communi
                 <div class="mx-auto">
                   <p class="text-center text-lg leading-relaxed text-pretty text-stone-600 sm:text-xl 2xl:text-2xl dark:text-stone-400">
                     Passionate about your pesto? Fanatical about your pho?
-                    Whatever your specialty, the OpenStove community is hungry
-                    for your recipes.
+                    Whatever your specialty, the Khana Khazana community is
+                    hungry for your recipes.
                   </p>
                   <div class="mt-8 text-center">
                     <a

@@ -1,17 +1,26 @@
 import type { APIRoute } from 'astro';
+import { createClient } from '@supabase/supabase-js';
 import {
   createContributionHandler,
-  isContributionConfigured,
+  parseIngredients,
+  parseSteps,
+  recipeSlug,
 } from '@/lib/contribution';
+import { serializeCommunityRecipeDetails } from '@/lib/communityRecipe';
 
 export const prerender = false;
 
 const env = {
-  GITHUB_TOKEN: import.meta.env.GITHUB_TOKEN,
-  GITHUB_REPO: import.meta.env.GITHUB_REPO,
+  SUPABASE_URL: import.meta.env.PUBLIC_SUPABASE_URL,
+  SUPABASE_ANON_KEY: import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
   TURNSTILE_SECRET_KEY: import.meta.env.TURNSTILE_SECRET_KEY,
   PROD: import.meta.env.PROD,
 };
+
+const supabase =
+  env.SUPABASE_URL && env.SUPABASE_ANON_KEY
+    ? createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY)
+    : null;
 
 /** Turnstile adapter; without a secret (local/dev) everyone is human. */
 async function verifyHuman(token: string, ip: string | null): Promise<boolean> {
@@ -30,38 +39,78 @@ async function verifyHuman(token: string, ip: string | null): Promise<boolean> {
   return Boolean(data.success);
 }
 
-/** GitHub Issues adapter. */
-async function createIssue(issue: { title: string; body: string }) {
-  const res = await fetch(
-    `https://api.github.com/repos/${env.GITHUB_REPO}/issues`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-        'User-Agent': 'OpenStove-Contribute',
-      },
-      body: JSON.stringify(issue),
-    }
-  );
+/** Supabase adapter: new contributions are published immediately. */
+async function createSubmission(submission: {
+  title: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  author?: string;
+  description?: string;
+  cookingTime?: number;
+  servings?: number;
+  scalable?: boolean;
+  tags?: string[];
+  ingredients?: string;
+  steps?: string;
+  notes?: string;
+}): Promise<void | { failed: true; status: number }> {
+  if (!supabase) return { failed: true as const, status: 503 };
 
-  if (!res.ok) {
-    console.error('GitHub issue create failed', res.status, await res.text());
-    return { failed: true as const, status: res.status };
+  const title = submission.title.trim();
+  const slug = recipeSlug(title) || 'community-recipe';
+  try {
+    const { data: existingRecipe, error: lookupError } = await supabase
+      .from('recipes')
+      .select('slug')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error('Failed to check recipe slug in Supabase:', lookupError);
+      return { failed: true as const, status: 502 };
+    }
+
+    const { error } = await supabase.from('recipes').insert({
+      slug: existingRecipe ? `${slug}-${Date.now()}` : slug,
+      title,
+      description: submission.description || '',
+      author: submission.author || 'anonymous',
+      image_url: submission.imageUrl || '',
+      image_alt: submission.imageAlt || title,
+      cooking_time: submission.cookingTime || 30,
+      servings: submission.servings || 1,
+      scalable: submission.scalable ?? true,
+      tags: submission.tags || [],
+      content: serializeCommunityRecipeDetails({
+        ingredients: parseIngredients(submission.ingredients || ''),
+        steps: parseSteps(submission.steps || ''),
+        recipeNotes: (submission.notes || '')
+          .split('\n')
+          .map(note => note.trim())
+          .filter(Boolean),
+      }),
+      status: 'published',
+    });
+    if (error) {
+      console.error('Failed to publish recipe in Supabase:', error);
+      return { failed: true as const, status: 502 };
+    }
+  } catch (error) {
+    console.error('Failed to publish recipe in Supabase:', error);
+    return { failed: true as const, status: 502 };
   }
-  const created = (await res.json()) as { html_url?: string };
-  return { url: created.html_url };
+
+  return;
 }
 
 const handleContribution = createContributionHandler({
   verifyHuman,
-  createIssue,
+  createSubmission,
+  rateLimitEnabled: env.PROD,
 });
 
 export const POST: APIRoute = async ({ request, clientAddress }) => {
-  if (!isContributionConfigured(env)) {
+  if (!supabase) {
     return Response.json(
       { ok: false, error: 'Contribution form is not configured.' },
       { status: 503 }
@@ -85,7 +134,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   });
 
   return result.ok
-    ? Response.json({ ok: true, url: result.issueUrl })
+    ? Response.json({ ok: true })
     : Response.json(
         { ok: false, error: result.message },
         { status: result.status }
